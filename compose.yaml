@@ -1,0 +1,178 @@
+name: ${COMPOSE_PROJECT_NAME:-etl-sem-kafka}
+
+x-lab: &lab
+  image: etl-files-lab:local
+  build:
+    context: .
+    dockerfile: docker/Dockerfile
+    args:
+      AIRFLOW_VERSION: ${AIRFLOW_VERSION:-3.3.2}
+      SPARK_VERSION: ${SPARK_VERSION:-3.5.7}
+      ICEBERG_VERSION: ${ICEBERG_VERSION:-1.10.0}
+  user: "50000:0"
+  working_dir: /opt/lab
+  environment: &lab-env
+    PYTHONPATH: /opt/lab
+    PYSPARK_PYTHON: python
+    SPARK_LOCAL_IP: 127.0.0.1
+    SOURCE_DIR: /opt/lab/data/source
+    STATE_DIR: /opt/lab-state
+    S3_ENDPOINT: http://silo:9000
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-labadmin}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-local-only-change-me-2026}
+    AWS_REGION: us-east-1
+    AWS_EC2_METADATA_DISABLED: "true"
+    POLARIS_URI: http://polaris:8181
+    POLARIS_REALM: ${POLARIS_REALM:-POLARIS}
+    POLARIS_CLIENT_ID: ${POLARIS_CLIENT_ID:-lab-admin}
+    POLARIS_CLIENT_SECRET: ${POLARIS_CLIENT_SECRET:-local-polaris-secret}
+    TRINO_URI: http://trino:8080
+  volumes:
+    - .:/opt/lab:ro
+    - work-data:/opt/lab-state
+    - generated-config:/opt/airflow/generated
+
+x-polaris-env: &polaris-env
+  POLARIS_PERSISTENCE_TYPE: relational-jdbc
+  QUARKUS_DATASOURCE_USERNAME: polaris
+  QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-local-db-secret}
+  QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://polaris-db:5432/polaris
+  POLARIS_REALM_CONTEXT_REALMS: ${POLARIS_REALM:-POLARIS}
+  AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-labadmin}
+  AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-local-only-change-me-2026}
+  AWS_REGION: us-east-1
+  AWS_EC2_METADATA_DISABLED: "true"
+
+services:
+  silo:
+    image: docker.io/pgsty/silo:${SILO_VERSION:-RELEASE.2026-10-26T00-00-00Z}
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-labadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-local-only-change-me-2026}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes: ["silo-data:/data"]
+    healthcheck:
+      test: ["CMD", "silo", "healthcheck", "ready"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  polaris-db:
+    image: postgres:${POSTGRES_VERSION:-17.6}
+    environment:
+      POSTGRES_USER: polaris
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-db-secret}
+      POSTGRES_DB: polaris
+    volumes: ["polaris-db-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polaris -d polaris"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  polaris-bootstrap:
+    image: apache/polaris-admin-tool:${POLARIS_VERSION:-1.5.0}
+    entrypoint: ["/bin/sh", "/opt/polaris-bootstrap.sh"]
+    volumes:
+      - ./docker/polaris-bootstrap.sh:/opt/polaris-bootstrap.sh:ro
+    environment: *polaris-env
+    command:
+      - bootstrap
+      - -r
+      - ${POLARIS_REALM:-POLARIS}
+      - -c
+      - ${POLARIS_REALM:-POLARIS},${POLARIS_CLIENT_ID:-lab-admin},${POLARIS_CLIENT_SECRET:-local-polaris-secret}
+    depends_on:
+      polaris-db: {condition: service_healthy}
+
+  polaris:
+    image: apache/polaris:${POLARIS_VERSION:-1.5.0}
+    environment:
+      <<: *polaris-env
+      QUARKUS_HTTP_PORT: "8181"
+      QUARKUS_MANAGEMENT_PORT: "8182"
+      JAVA_OPTS_APPEND: -Xms128m -Xmx768m
+    ports:
+      - "127.0.0.1:8181:8181"
+      - "127.0.0.1:8182:8182"
+    depends_on:
+      polaris-bootstrap: {condition: service_completed_successfully}
+      silo: {condition: service_healthy}
+
+  lab-init:
+    <<: *lab
+    user: "1000:0"
+    command: ["python", "-m", "app.bootstrap"]
+    depends_on:
+      polaris: {condition: service_started}
+      silo: {condition: service_healthy}
+
+  airflow-db:
+    image: postgres:${POSTGRES_VERSION:-17.6}
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local-db-secret}
+      POSTGRES_DB: airflow
+    volumes: ["airflow-db-data:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  airflow:
+    <<: *lab
+    command: ["standalone"]
+    environment:
+      <<: *lab-env
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:${POSTGRES_PASSWORD:-local-db-secret}@airflow-db:5432/airflow
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/lab/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__PARALLELISM: "2"
+      AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG: "1"
+      AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+      AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:-local-only-jwt-key-0123456789abcdef0123456789abcdef}
+      AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://localhost:8080/execution/
+    volumes:
+      - .:/opt/lab:ro
+      - work-data:/opt/lab-state
+      - generated-config:/opt/airflow/generated
+      - airflow-logs:/opt/airflow/logs
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      airflow-db: {condition: service_healthy}
+      lab-init: {condition: service_completed_successfully}
+      trino: {condition: service_started}
+
+  trino:
+    image: trinodb/trino:${TRINO_VERSION:-484}
+    ports: ["127.0.0.1:8081:8080"]
+    volumes:
+      - ./config/trino/config.properties:/etc/trino/config.properties:ro
+      - ./config/trino/jvm.config:/etc/trino/jvm.config:ro
+      - generated-config:/etc/trino/catalog:ro
+    depends_on:
+      lab-init: {condition: service_completed_successfully}
+
+  dashboard:
+    profiles: ["dashboard"]
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    environment:
+      TRINO_URI: http://trino:8080
+    ports: ["127.0.0.1:8501:8501"]
+    depends_on:
+      trino: {condition: service_started}
+
+volumes:
+  silo-data:
+  polaris-db-data:
+  airflow-db-data:
+  work-data:
+  generated-config:
+  airflow-logs:

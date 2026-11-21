@@ -1,0 +1,16 @@
+[
+  {
+    "book_id": 11,
+    "body_char_count": 147990,
+    "word_count": 27427,
+    "alice_mentions": 399,
+    "monster_mentions": 0
+  },
+  {
+    "book_id": 84,
+    "body_char_count": 426706,
+    "word_count": 75328,
+    "alice_mentions": 0,
+    "monster_mentions": 31
+  }
+]

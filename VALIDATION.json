@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-07",
+  "offline_tests": {
+    "result": "PASS",
+    "count": 17,
+    "output": ".................                                                        [100%]\n=============================== warnings summary ===============================\n../../../../usr/local/lib/python3.12/site-packages/requests/__init__.py:113\n  /usr/local/lib/python3.12/site-packages/requests/__init__.py:113: RequestsDependencyWarning: urllib3 (2.6.0) or chardet (7.5.1)/charset_normalizer (3.4.2) doesn't match a supported version!\n    warnings.warn(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n17 passed, 1 warning in 0.19s"
+  },
+  "python_ast": {
+    "result": "PASS",
+    "files": 17
+  },
+  "bash_syntax": {
+    "result": "PASS",
+    "scripts": 4
+  },
+  "docker_compose_config": {
+    "result": "PASS",
+    "version": "v2.39.4",
+    "services": 8,
+    "bind_mounts_exist": true
+  },
+  "spark_real_local_test": {
+    "status": "PASS",
+    "negative_test": "invalid markers blocked; snapshot unchanged",
+    "spark": "3.5.7",
+    "iceberg": "1.10.0",
+    "backend": "local HadoopCatalog",
+    "row_counts_after_two_runs": [
+      2,
+      2
+    ],
+    "java": "Temurin 17.0.21 JRE",
+    "scope": "Same transform_load.py with session substituted to local HadoopCatalog; no S3/REST or Trino runtime"
+  },
+  "registry_tags": "Airflow 3.3.2-python3.11, Polaris/admin-tool 1.5.0, Trino 484, Postgres 17.6, Java 17.0.17_10-jre-jammy existence verified",
+  "not_executed": [
+    "Docker image build",
+    "Container startup",
+    "Airflow scheduler/worker DAG execution",
+    "Spark REST Polaris + SILO integration",
+    "Trino runtime validation",
+    "Container smoke and negative tests"
+  ],
+  "limitations": "The local Spark test proves transformation and local Iceberg writes only. Runtime interoperability of the full stack must be validated on the user host."
+}

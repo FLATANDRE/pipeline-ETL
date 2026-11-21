@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="670" viewBox="0 0 1440 670" role="img" aria-labelledby="title desc">
+<title id="title">ETL com arquivos, sem broker</title>
+<desc id="desc">CSV e TXT são extraídos para um snapshot local. PySpark transforma antes de carregar tabela Iceberg no SILO. Trino consulta; Airflow orquestra e Polaris cataloga.</desc>
+<defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#82939d"/></marker></defs>
+<rect width="1440" height="670" fill="#101b25"/>
+<g font-family="Arial, sans-serif" fill="#eef6f7"><text x="65" y="70" font-size="34" font-weight="bold">ETL: transformar antes de carregar</text><text x="65" y="109" font-size="22" fill="#a9bec9">Origem por arquivos • Sem Kafka • Carga batch</text>
+<rect x="65" y="165" width="1310" height="67" rx="14" fill="#223744"/><text x="720" y="207" text-anchor="middle" font-size="24">Airflow: extração → transformação/carga → validação</text>
+<rect x="65" y="282" width="208" height="132" rx="14" fill="#274555"/><text x="169" y="330" text-anchor="middle" font-size="24">CSV + TXT</text><text x="169" y="370" text-anchor="middle" font-size="19">Origem / snapshot local</text>
+<rect x="325" y="282" width="290" height="132" rx="14" fill="#28515a"/><text x="470" y="327" text-anchor="middle" font-size="24">PySpark</text><text x="470" y="363" text-anchor="middle" font-size="20">Validar, relacionar,</text><text x="470" y="391" text-anchor="middle" font-size="20">extrair características</text>
+<rect x="700" y="255" width="390" height="186" rx="18" fill="none" stroke="#57c6b4" stroke-width="2"/><text x="895" y="282" text-anchor="middle" font-size="18" fill="#7ee3ce">DESTINO ANALÍTICO</text>
+<rect x="723" y="303" width="344" height="112" rx="14" fill="#28515a"/><text x="895" y="345" text-anchor="middle" font-size="24">Iceberg no SILO</text><text x="895" y="382" text-anchor="middle" font-size="20">Somente dados preparados</text>
+<rect x="1140" y="282" width="235" height="132" rx="14" fill="#274555"/><text x="1257" y="330" text-anchor="middle" font-size="24">Trino</text><text x="1257" y="370" text-anchor="middle" font-size="20">Consultar e validar</text>
+<path d="M273 349 H322 M615 349 H719 M1067 349 H1137" fill="none" stroke="#82939d" stroke-width="3" marker-end="url(#arrow)"/>
+<rect x="325" y="492" width="1050" height="66" rx="14" fill="#223744"/><text x="850" y="534" text-anchor="middle" font-size="23">Polaris: catálogo REST usado por Spark e Trino</text>
+<text x="65" y="616" font-size="20" fill="#a9bec9">Setas = fluxo de dados. Barras = serviços de controle; dados não transitam pelo Airflow.</text></g></svg>

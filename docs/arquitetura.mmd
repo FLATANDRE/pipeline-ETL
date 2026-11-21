@@ -1,0 +1,11 @@
+flowchart LR
+  subgraph O["Origem e extração local"]
+    C["CSV estruturado"] --> E["Airflow: extrair arquivos"]
+    T["TXT não estruturado"] --> E
+    E --> W["Snapshot local com hashes"]
+  end
+  W --> P["PySpark: validar, unir e extrair features"]
+  P -->|"Carregar apenas o resultado"| I["Tabela Iceberg no SILO"]
+  I --> Q["Trino: consultar e validar"]
+  A["Airflow: coordena todas as etapas"]
+  R["Polaris: catálogo REST compartilhado"]
